@@ -17,10 +17,11 @@ import (
 
 func main() {
 	listenAddr := flag.String("listen", "127.0.0.1:8004", "gRPC listen address")
+	verbose := flag.Bool("verbose", false, "log incoming requests and outgoing responses")
 	flag.Parse()
 
 	store := storage.NewInMemoryStore()
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(loggingInterceptor(verbose)))
 	mdoffloadv1.RegisterMDOffloadServiceServer(grpcServer, service.NewMDOffloadServer(store))
 
 	lis, err := net.Listen("tcp", *listenAddr)
@@ -41,5 +42,26 @@ func main() {
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("gRPC server failed: %v", err)
+	}
+}
+
+// loggingInterceptor emits request/response bodies for unary RPCs when verbose logging is enabled.
+func loggingInterceptor(verbose *bool) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if verbose != nil && *verbose {
+			log.Printf("incoming %s: %+v", info.FullMethod, req)
+		}
+
+		resp, err := handler(ctx, req)
+
+		if verbose != nil && *verbose {
+			if err != nil {
+				log.Printf("reply %s error: %v", info.FullMethod, err)
+			} else {
+				log.Printf("reply %s: %+v", info.FullMethod, resp)
+			}
+		}
+
+		return resp, err
 	}
 }
