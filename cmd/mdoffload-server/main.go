@@ -17,10 +17,37 @@ import (
 
 func main() {
 	listenAddr := flag.String("listen", "127.0.0.1:8004", "gRPC listen address")
+	backend := flag.String("backend", "tikv", "storage backend: tikv|memory")
 	verbose := flag.Bool("verbose", false, "log incoming requests and outgoing responses")
 	flag.Parse()
 
-	store := storage.NewInMemoryStore()
+	var (
+		store   storage.Store
+		closeFn func() error
+	)
+
+	switch *backend {
+	case "tikv":
+		tikvStore, err := storage.NewTiKVStore()
+		if err != nil {
+			log.Fatalf("failed to init TiKV store: %v", err)
+		}
+		store = tikvStore
+		closeFn = tikvStore.Close
+	case "memory":
+		store = storage.NewInMemoryStore()
+	default:
+		log.Fatalf("unknown backend %q (use tikv|memory)", *backend)
+	}
+
+	if closeFn != nil {
+		defer func() {
+			if err := closeFn(); err != nil {
+				log.Printf("backend close error: %v", err)
+			}
+		}()
+	}
+
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(loggingInterceptor(verbose)))
 	mdoffloadv1.RegisterMDOffloadServiceServer(grpcServer, service.NewMDOffloadServer(store))
 
