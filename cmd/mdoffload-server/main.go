@@ -19,6 +19,9 @@ func main() {
 	listenAddr := flag.String("listen", "127.0.0.1:8004", "gRPC listen address")
 	backend := flag.String("backend", "tikv", "storage backend: tikv|memory")
 	verbose := flag.Bool("verbose", false, "log incoming requests and outgoing responses")
+	var pdHost string
+	flag.StringVar(&pdHost, "tikv-pd-host", "http://127.0.0.1:2379", "TiKV PD address (http) for tikv backend")
+	flag.StringVar(&pdHost, "u", "http://127.0.0.1:2379", "shorthand for --tikv-pd-host")
 	flag.Parse()
 
 	var (
@@ -28,7 +31,7 @@ func main() {
 
 	switch *backend {
 	case "tikv":
-		tikvStore, err := storage.NewTiKVStore()
+		tikvStore, err := storage.NewTiKVStore(pdHost)
 		if err != nil {
 			log.Fatalf("failed to init TiKV store: %v", err)
 		}
