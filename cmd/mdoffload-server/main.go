@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -79,7 +80,7 @@ func main() {
 func loggingInterceptor(verbose *bool) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if verbose != nil && *verbose {
-			log.Printf("incoming %s: %+v", info.FullMethod, req)
+			log.Printf("incoming %s: %s", info.FullMethod, formatLogPayload(req))
 		}
 
 		resp, err := handler(ctx, req)
@@ -88,10 +89,25 @@ func loggingInterceptor(verbose *bool) grpc.UnaryServerInterceptor {
 			if err != nil {
 				log.Printf("reply %s error: %v", info.FullMethod, err)
 			} else {
-				log.Printf("reply %s: %+v", info.FullMethod, resp)
+				log.Printf("reply %s: %s", info.FullMethod, formatLogPayload(resp))
 			}
 		}
 
 		return resp, err
+	}
+}
+
+// formatLogPayload enriches logs so object_instance_id is explicit for object RPCs
+// while retaining a helpful default for all other messages.
+func formatLogPayload(msg interface{}) string {
+	switch v := msg.(type) {
+	case *mdoffloadv1.GetObjectAttributesRequest:
+		return fmt.Sprintf("object_instance_id=%q payload=%+v", v.GetObjectInstanceId(), v)
+	case *mdoffloadv1.SetObjectAttributesRequest:
+		return fmt.Sprintf("object_instance_id=%q payload=%+v", v.GetObjectInstanceId(), v)
+	case *mdoffloadv1.PurgeObjectAttributesRequest:
+		return fmt.Sprintf("object_instance_id=%q payload=%+v", v.GetObjectInstanceId(), v)
+	default:
+		return fmt.Sprintf("%+v", msg)
 	}
 }

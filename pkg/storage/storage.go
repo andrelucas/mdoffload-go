@@ -170,11 +170,10 @@ func objectKey(ref ObjectRef) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	instance := ref.ObjectInstanceID
-	if instance == "" {
-		instance = "default"
-	}
-	return fmt.Sprintf("%s|object:%s|instance:%s", bucket, ref.ObjectKey, instance), nil
+	// The key must incorporate both object_key and object_instance_id so distinct
+	// versions of the same object key do not collide. An empty instance ID is
+	// valid (e.g., non-versioned buckets) and is preserved as-is.
+	return fmt.Sprintf("%s|object:%s|instance:%s", bucket, ref.ObjectKey, ref.ObjectInstanceID), nil
 }
 
 func cloneMap(src map[string][]byte) map[string][]byte {
