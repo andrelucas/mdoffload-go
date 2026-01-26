@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrBucketReferenceMissing = errors.New("bucket_id or bucket_name is required")
+	ErrBucketIDMissing        = errors.New("bucket_id is required")
 	ErrObjectKeyMissing       = errors.New("object_key is required")
 )
 
@@ -149,17 +150,10 @@ func (s *inMemoryStore) PurgeObjectAttributes(_ context.Context, ref ObjectRef) 
 }
 
 func bucketKey(ref BucketRef) (string, error) {
-	if ref.BucketID != "" {
-		return "id:" + ref.BucketID, nil
+	if ref.BucketID == "" {
+		return "", ErrBucketIDMissing
 	}
-	if ref.BucketName != "" {
-		key := "name:" + ref.BucketName
-		if ref.UserID != "" {
-			key += "|user:" + ref.UserID
-		}
-		return key, nil
-	}
-	return "", ErrBucketReferenceMissing
+	return "id:" + ref.BucketID, nil
 }
 
 func objectKey(ref ObjectRef) (string, error) {

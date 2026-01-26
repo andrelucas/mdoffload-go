@@ -87,7 +87,7 @@ func objectRefFromRequest(userID, bucketID, bucketName, objectKey, instanceID st
 
 func mapStorageError(err error) error {
 	switch {
-	case errors.Is(err, storage.ErrBucketReferenceMissing), errors.Is(err, storage.ErrObjectKeyMissing):
+	case errors.Is(err, storage.ErrBucketReferenceMissing), errors.Is(err, storage.ErrBucketIDMissing), errors.Is(err, storage.ErrObjectKeyMissing):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Errorf(codes.Internal, "storage error: %v", err)
