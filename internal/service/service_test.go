@@ -12,99 +12,172 @@ import (
 )
 
 func newTestServer() *MDOffloadServer {
-    return NewMDOffloadServer(storage.NewInMemoryStore())
+	return NewMDOffloadServer(storage.NewInMemoryStore())
 }
 
 func TestBucketIDRequired(t *testing.T) {
-    srv := newTestServer()
-    _, err := srv.GetBucketAttributes(context.Background(), &mdoffloadv1.GetBucketAttributesRequest{BucketName: "shared"})
-    if err == nil {
-        t.Fatalf("expected error for missing bucket_id")
-    }
-    if status.Code(err) != codes.InvalidArgument {
-        t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
-    }
+	srv := newTestServer()
+	_, err := srv.GetBucketAttributes(context.Background(), &mdoffloadv1.GetBucketAttributesRequest{BucketName: "shared"})
+	if err == nil {
+		t.Fatalf("expected error for missing bucket_id")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
+	}
 }
 
 func TestBucketIDUniqueness(t *testing.T) {
-    ctx := context.Background()
-    srv := newTestServer()
+	ctx := context.Background()
+	srv := newTestServer()
 
-    put := func(bucketID, val string) {
-        req := &mdoffloadv1.SetBucketAttributesRequest{
-            BucketId:                 bucketID,
-            BucketName:               "shared-name",
-            AttributesToAdd:          map[string][]byte{"color": []byte(val)},
-            ReplaceExistingAttributes: false,
-        }
-        if _, err := srv.SetBucketAttributes(ctx, req); err != nil {
-            t.Fatalf("set attrs for bucket %s: %v", bucketID, err)
-        }
-    }
+	put := func(bucketID, val string) {
+		req := &mdoffloadv1.SetBucketAttributesRequest{
+			BucketId:                  bucketID,
+			BucketName:                "shared-name",
+			AttributesToAdd:           map[string][]byte{"color": []byte(val)},
+			ReplaceExistingAttributes: false,
+		}
+		if _, err := srv.SetBucketAttributes(ctx, req); err != nil {
+			t.Fatalf("set attrs for bucket %s: %v", bucketID, err)
+		}
+	}
 
-    get := func(bucketID string) map[string][]byte {
-        resp, err := srv.GetBucketAttributes(ctx, &mdoffloadv1.GetBucketAttributesRequest{
-            BucketId:   bucketID,
-            BucketName: "shared-name",
-        })
-        if err != nil {
-            t.Fatalf("get attrs for bucket %s: %v", bucketID, err)
-        }
-        return resp.GetAttributes()
-    }
+	get := func(bucketID string) map[string][]byte {
+		resp, err := srv.GetBucketAttributes(ctx, &mdoffloadv1.GetBucketAttributesRequest{
+			BucketId:   bucketID,
+			BucketName: "shared-name",
+		})
+		if err != nil {
+			t.Fatalf("get attrs for bucket %s: %v", bucketID, err)
+		}
+		return resp.GetAttributes()
+	}
 
-    put("bucket-1", "blue")
-    put("bucket-2", "red")
+	put("bucket-1", "blue")
+	put("bucket-2", "red")
 
-    attrs1 := get("bucket-1")
-    attrs2 := get("bucket-2")
+	attrs1 := get("bucket-1")
+	attrs2 := get("bucket-2")
 
-    assertEqualAttrs(t, map[string][]byte{"color": []byte("blue")}, attrs1)
-    assertEqualAttrs(t, map[string][]byte{"color": []byte("red")}, attrs2)
+	assertEqualAttrs(t, map[string][]byte{"color": []byte("blue")}, attrs1)
+	assertEqualAttrs(t, map[string][]byte{"color": []byte("red")}, attrs2)
 }
 
 func TestObjectInstanceIsolation(t *testing.T) {
-    ctx := context.Background()
-    srv := newTestServer()
+	ctx := context.Background()
+	srv := newTestServer()
 
-    set := func(instanceID, key, val string) {
-        _, err := srv.SetObjectAttributes(ctx, &mdoffloadv1.SetObjectAttributesRequest{
-            BucketId:          "bucket-1",
-            ObjectKey:         "object-key",
-            ObjectInstanceId:  instanceID,
-            AttributesToAdd:   map[string][]byte{key: []byte(val)},
-            NewObjectInstance: true,
-        })
-        if err != nil {
-            t.Fatalf("set attrs for instance %s: %v", instanceID, err)
-        }
-    }
+	set := func(instanceID, key, val string) {
+		_, err := srv.SetObjectAttributes(ctx, &mdoffloadv1.SetObjectAttributesRequest{
+			BucketId:          "bucket-1",
+			ObjectKey:         "object-key",
+			ObjectInstanceId:  instanceID,
+			AttributesToAdd:   map[string][]byte{key: []byte(val)},
+			NewObjectInstance: true,
+		})
+		if err != nil {
+			t.Fatalf("set attrs for instance %s: %v", instanceID, err)
+		}
+	}
 
-    get := func(instanceID string) map[string][]byte {
-        resp, err := srv.GetObjectAttributes(ctx, &mdoffloadv1.GetObjectAttributesRequest{
-            BucketId:         "bucket-1",
-            ObjectKey:        "object-key",
-            ObjectInstanceId: instanceID,
-        })
-        if err != nil {
-            t.Fatalf("get attrs for instance %s: %v", instanceID, err)
-        }
-        return resp.GetAttributes()
-    }
+	get := func(instanceID string) map[string][]byte {
+		resp, err := srv.GetObjectAttributes(ctx, &mdoffloadv1.GetObjectAttributesRequest{
+			BucketId:         "bucket-1",
+			ObjectKey:        "object-key",
+			ObjectInstanceId: instanceID,
+		})
+		if err != nil {
+			t.Fatalf("get attrs for instance %s: %v", instanceID, err)
+		}
+		return resp.GetAttributes()
+	}
 
-    set("inst-1", "size", "small")
-    set("inst-2", "size", "large")
+	set("inst-1", "size", "small")
+	set("inst-2", "size", "large")
 
-    attrs1 := get("inst-1")
-    attrs2 := get("inst-2")
+	attrs1 := get("inst-1")
+	attrs2 := get("inst-2")
 
-    assertEqualAttrs(t, map[string][]byte{"size": []byte("small")}, attrs1)
-    assertEqualAttrs(t, map[string][]byte{"size": []byte("large")}, attrs2)
+	assertEqualAttrs(t, map[string][]byte{"size": []byte("small")}, attrs1)
+	assertEqualAttrs(t, map[string][]byte{"size": []byte("large")}, attrs2)
+}
+
+func TestObjectLookupDoesNotCrossBuckets(t *testing.T) {
+	ctx := context.Background()
+	srv := newTestServer()
+
+	_, err := srv.SetObjectAttributes(ctx, &mdoffloadv1.SetObjectAttributesRequest{
+		BucketId:          "bucket-1",
+		BucketName:        "alpha",
+		ObjectKey:         "object-key",
+		ObjectInstanceId:  "instance-1",
+		AttributesToAdd:   map[string][]byte{"color": []byte("blue")},
+		NewObjectInstance: true,
+	})
+	if err != nil {
+		t.Fatalf("set attrs in source bucket: %v", err)
+	}
+
+	resp, err := srv.GetObjectAttributes(ctx, &mdoffloadv1.GetObjectAttributesRequest{
+		BucketId:         "bucket-2",
+		BucketName:       "alpha",
+		ObjectKey:        "object-key",
+		ObjectInstanceId: "instance-1",
+	})
+	if err != nil {
+		t.Fatalf("get attrs in different bucket: %v", err)
+	}
+	if len(resp.GetAttributes()) != 0 {
+		t.Fatalf("expected no attributes when bucket id differs, got %#v", resp.GetAttributes())
+	}
+}
+
+func TestObjectLookupRequiresFullKeyMatch(t *testing.T) {
+	ctx := context.Background()
+	srv := newTestServer()
+
+	set := func(objectKey, instanceID, value string) {
+		_, err := srv.SetObjectAttributes(ctx, &mdoffloadv1.SetObjectAttributesRequest{
+			BucketId:          "bucket-1",
+			BucketName:        "alpha",
+			ObjectKey:         objectKey,
+			ObjectInstanceId:  instanceID,
+			AttributesToAdd:   map[string][]byte{"tag": []byte(value)},
+			NewObjectInstance: true,
+		})
+		if err != nil {
+			t.Fatalf("set attrs for %s/%s: %v", objectKey, instanceID, err)
+		}
+	}
+
+	get := func(objectKey, instanceID string) map[string][]byte {
+		resp, err := srv.GetObjectAttributes(ctx, &mdoffloadv1.GetObjectAttributesRequest{
+			BucketId:         "bucket-1",
+			BucketName:       "alpha",
+			ObjectKey:        objectKey,
+			ObjectInstanceId: instanceID,
+		})
+		if err != nil {
+			t.Fatalf("get attrs for %s/%s: %v", objectKey, instanceID, err)
+		}
+		return resp.GetAttributes()
+	}
+
+	set("object-a", "inst-1", "blue")
+	set("object-b", "inst-1", "green")
+	set("object-a", "inst-2", "red")
+
+	assertEqualAttrs(t, map[string][]byte{"tag": []byte("blue")}, get("object-a", "inst-1"))
+	assertEqualAttrs(t, map[string][]byte{"tag": []byte("red")}, get("object-a", "inst-2"))
+	assertEqualAttrs(t, map[string][]byte{"tag": []byte("green")}, get("object-b", "inst-1"))
+	if attrs := get("object-b", "inst-2"); len(attrs) != 0 {
+		t.Fatalf("expected no attributes for unmatched object/instance, got %#v", attrs)
+	}
 }
 
 func assertEqualAttrs(t *testing.T, want, got map[string][]byte) {
-    t.Helper()
-    if !reflect.DeepEqual(want, got) {
-        t.Fatalf("attributes mismatch\nwant: %#v\n got: %#v", want, got)
-    }
+	t.Helper()
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("attributes mismatch\nwant: %#v\n got: %#v", want, got)
+	}
 }
